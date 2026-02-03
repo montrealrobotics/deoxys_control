@@ -59,7 +59,7 @@ def main():
         e + np.clip(np.random.randn() * 0.005, -0.005, 0.005)
         for e in reset_joint_positions
     ]
-    action = reset_joint_positions + [-1.0]
+    action = reset_joint_positions
 
     while True:
         if len(robot_interface._state_buffer) > 0:
