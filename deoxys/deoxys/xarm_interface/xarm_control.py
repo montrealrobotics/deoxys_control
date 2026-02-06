@@ -168,8 +168,11 @@ class XArmRobot(object):
 
     def get_joint_state(self) -> np.ndarray:
         state = self.get_state()
-        gripper = state.gripper_pos()
-        all_dofs = np.concatenate([state.joints(), np.array([gripper])])
+        if self.use_gripper:
+            gripper = state.gripper_pos()
+            all_dofs = np.concatenate([state.joints(), np.array([gripper])])
+        else:
+            all_dofs = state.joints()
         return all_dofs
 
     def command_joint_state(self, joint_state: np.ndarray) -> None:
