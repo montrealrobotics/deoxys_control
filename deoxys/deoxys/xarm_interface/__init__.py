@@ -1,1 +1,1 @@
-from .xarm_interface import XArm6Interface
+from .xarm_interface import XArmInterface
