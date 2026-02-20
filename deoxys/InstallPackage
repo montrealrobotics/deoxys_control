@@ -2,14 +2,13 @@
 
 RED='\033[0;31m'
 NC='\033[0m' # No Color
-
-sudo apt install build-essential cmake git libpoco-dev libeigen3-dev -y
+apt install build-essential cmake git libpoco-dev libeigen3-dev -y
 
 # For protoc
-sudo apt-get install autoconf automake libtool curl make g++ unzip -y
+apt-get install autoconf automake libtool curl make g++ unzip -y
 
 # For zmq
-sudo apt-get install libzmq3-dev -y
+apt-get install libzmq3-dev -y
 
 # download libfranka
 git clone --recursive https://github.com/frankaemika/libfranka
@@ -49,10 +48,10 @@ git submodule update
 ./configure
 make
 make check
-sudo make install
-sudo ldconfig # refresh shared library cache.
+make install
+ldconfig # refresh shared library cache.
 
 # Install other apt packages
-sudo apt install libreadline-dev -y
-sudo apt install bzip2 -y
-sudo apt install libmotif-dev libglfw3 -y
+apt install libreadline-dev -y
+apt install bzip2 -y
+apt install libmotif-dev libglfw3 -y
