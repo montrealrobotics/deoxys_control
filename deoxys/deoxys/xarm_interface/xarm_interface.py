@@ -17,6 +17,7 @@ class XArmInterface:
     def __init__(
         self,
         robot_ctrl_ip: str,
+        use_gripper: bool = False,
         cmd_port: int = 5555,
         state_port: int = 5556,
         dof: int = 6,
@@ -30,7 +31,7 @@ class XArmInterface:
         self._control_timeout = control_timeout
 
         self.joint_map = joint_map if joint_map is not None else list(range(dof))
-
+        self.use_gripper = use_gripper
         self._ctx = zmq.Context.instance()
 
         self._pub = self._ctx.socket(zmq.PUB)
@@ -67,12 +68,21 @@ class XArmInterface:
                     data = np.frombuffer(msg, dtype=np.float64)
                     if data.size >= (1 + self.dof + 7):
                         with self._state_lock:
-                            self._latest_state = {
-                                "timestamp": data[0],
-                                "joint_positions": data[1:1+self.dof],
-                                "ee_pos": data[1+self.dof:1+self.dof+3],
-                                "ee_quat": data[1+self.dof+3:1+self.dof+7]
-                            }
+                            if self.use_gripper:
+                                self._latest_state = {
+                                    "timestamp": data[0],
+                                    "joint_positions": data[1:1+self.dof_arm],
+                                    "gripper_pos": data[1+self.dof_arm],
+                                    "ee_pos": data[2+self.dof_arm:2+self.dof_arm+3],
+                                    "ee_quat": data[2+self.dof_arm+3:2+self.dof_arm+7]
+                                }
+                            else:
+                                self._latest_state = {
+                                    "timestamp": data[0],
+                                    "joint_positions": data[1:1+self.dof],
+                                    "ee_pos": data[1+self.dof:1+self.dof+3],
+                                    "ee_quat": data[1+self.dof+3:1+self.dof+7]
+                                }
             except Exception as e:
                 logger.error(f"Error receiving state: {e}")
             time.sleep(0.001)
