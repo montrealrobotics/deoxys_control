@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-import math
 import time
 import logging
 from typing import List, Optional
+import argparse
 
 import numpy as np
 import zmq
 
-from xarm_controller import XArmRobot, Rate
+from xarm_control import XArmRobot, Rate
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class XArmBridge:
-    def __init__(self, robot_ip="192.168.42.222", dof=6):
+    def __init__(self, robot_ip="192.168.42.222", dof=6, use_gripper=False, real_robot=True):
         self.dof = dof
         self.zmq_sub_addr = "tcp://0.0.0.0:5555"
         self.zmq_pub_addr = "tcp://0.0.0.0:5556"
@@ -22,8 +22,8 @@ class XArmBridge:
 
         self.robot = XArmRobot(
             ip=robot_ip,
-            real=True,
-            use_gripper=False,
+            real=real_robot,
+            use_gripper=use_gripper,
             dof=dof,
             control_frequency=50.0
         )
@@ -74,7 +74,7 @@ class XArmBridge:
                     obs["joint_positions"],
                     obs["ee_pos_quat"]
                 ]).astype(np.float64)
-                print(state_packet)
+                logger.debug(state_packet)
                 self.pub_sock.send(state_packet.tobytes())
 
                 rate.sleep()
@@ -84,5 +84,14 @@ class XArmBridge:
             self.robot.stop()
 
 if __name__ == "__main__":
-    bridge = XArmBridge(robot_ip="192.168.42.222", dof=6)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('robot_ip', type=str, default="192.168.42.222")
+    parser.add_argument('-d', '--dof', type=int, default=6)
+    parser.add_argument('-g', '--gripper', action='store_true')
+    args = parser.parse_args()
+
+    robot_ip = args.robot_ip
+    dof = args.dof
+    gripper = args.gripper
+    bridge = XArmBridge(robot_ip=robot_ip, dof=dof, use_gripper=gripper, real_robot=True)
     bridge.run()

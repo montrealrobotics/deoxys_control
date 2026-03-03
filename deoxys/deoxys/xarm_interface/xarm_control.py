@@ -24,7 +24,7 @@ class Transformations:
         assert quat.shape == (4,), "Input quaternion must be a 4D vector."
         norm = np.linalg.norm(quat)
         assert norm != 0, "Input quaternion must not be a zero vector."
-        quat = quat / norm  # Normalize the quaternion
+        quat = quat / norm
 
         Q = Quaternion(w=quat[3], x=quat[0], y=quat[1], z=quat[2])
         angle = Q.angle
@@ -43,9 +43,12 @@ class Transformations:
             np.ndarray: The quaternion representation of the axis-angle.
         """
         assert aa.shape == (3,), "Input axis-angle must be a 3D vector."
+
         norm = np.linalg.norm(aa)
-        assert norm != 0, "Input axis-angle must not be a zero vector."
-        axis = aa / norm  # Normalize the axis-angle
+        if norm < 1e-8:
+            return np.array([0.0, 0.0, 0.0, 1.0])
+
+        axis = aa / norm
 
         Q = Quaternion(axis=axis, angle=norm)
         quat = np.array([Q.x, Q.y, Q.z, Q.w])
@@ -301,7 +304,6 @@ class XArmRobot(object):
             if count % 1000 == 0:
                 # Mean, Std, Min, Max, only show 3 decimal places and string pad with 10 spaces
                 frequency = 1 / np.mean(step_times)
-                # print(f"Step time - mean: {np.mean(step_times):10.3f}, std: {np.std(step_times):10.3f}, min: {np.min(step_times):10.3f}, max: {np.max(step_times):10.3f}")
                 logger.warn(
                     f"Low  Level Frequency - mean: {frequency:10.3f}, std: {np.std(frequency):10.3f}, min: {np.min(frequency):10.3f}, max: {np.max(frequency):10.3f}"
                 )

@@ -51,75 +51,102 @@ Overall, the installation has three parts:
 Here are the details. For more information, please refer to the [Codebase Installation Page](https://ut-austin-rpl.github.io/deoxys-docs/html/installation/codebase_installation.html).
 
 Clone this repo to the robot workspace directory on Desktop computer (e.g. `/home/USERNAME/robot-control-ws`)
+<details>
+  <summary>If using Xarm arm</summary>
 
-``` shell
-cd deoxys_control/deoxys
-```
+  Install the python dependencies (feel free to add pull requests if anything is missing) from `deoxys_control/requirements.txt`, by doing:
+  ```shell
+  cd deoxys_control
+  pip install -U -r requirements.txt
+  ```
 
-## Install dependencies
+  Install the xarm SDK:
+  ```
+  pip install xarm-python-sdk
+  ```
+  ### Launch xarm control on Control PC (Intel NUC)
 
-Run the `InstallPackage` file to install necessary packages.
-``` shell
-./InstallPackage
-```
+  ```
+  cd deoxys_control
+
+  python deoxys/deoxys/xarm_interface/xarm_client.py <IP of robot control box>
+  ```
+
+</details>
 
 
-## Deoxys - Desktop
+<details>
+  <summary>If using Franka arm</summary>
 
-Make sure that you are in your python virtual environment before
-	building this.
-``` shell
-make -j build_deoxys=1
-```
+  ``` shell
+  cd deoxys_control/deoxys
+  ```
 
-And install all the python dependencies (feel free to add pull requests if anything is missing) from `deoxys_control/requirements.txt`, by doing:
-```shell
-pip install -U -r requirements.txt
-```
+  ## Install dependencies
 
-## Franka Interface - Intel NUC
+  Run the `InstallPackage` file to install necessary packages.
+  ``` shell
+  ./InstallPackage
+  ```
 
-Franka Interface is the part which is supposed to run on NUC. Run this 
-command in directory `deoxys_control/deoxys/` on Intel NUC. 
+  ## Deoxys - Desktop
 
-``` shell
-make -j build_franka=1
-```
+  Make sure that you are in your python virtual environment before
+    building this.
+  ``` shell
+  make -j build_deoxys=1
+  ```
 
-## A laundry list of pointers:
-   - [How to turn on/off the robot](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/running_robots.html)
-   - [How to install spacemouse](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/using_teleoperation_devices.html)
-   - [How to set up the RTOS](https://ut-austin-rpl.github.io/deoxys-docs/html/installation/system_prerequisite.html)
-   - [How to record and replay a trajectory](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/record_and_replay.html)
-   - [How to write a simple motor program](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/handcrafting_motor_program.html)
+  And install all the python dependencies (feel free to add pull requests if anything is missing) from `deoxys_control/requirements.txt`, by doing:
+  ```shell
+  pip install -U -r requirements.txt
+  ```
 
-# Control the robot
+  ## Franka Interface - Intel NUC
 
-## Commands on Desktop
+  Franka Interface is the part which is supposed to run on NUC. Run this
+  command in directory `deoxys_control/deoxys/` on Intel NUC.
 
-Here is a quick guide to run `Deoxys`.
+  ``` shell
+  make -j build_franka=1
+  ```
 
-Under `deoxys_control/deoxys`,  run
+  ## A laundry list of pointers:
+    - [How to turn on/off the robot](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/running_robots.html)
+    - [How to install spacemouse](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/using_teleoperation_devices.html)
+    - [How to set up the RTOS](https://ut-austin-rpl.github.io/deoxys-docs/html/installation/system_prerequisite.html)
+    - [How to record and replay a trajectory](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/record_and_replay.html)
+    - [How to write a simple motor program](https://ut-austin-rpl.github.io/deoxys-docs/html/tutorials/handcrafting_motor_program.html)
 
-``` shell
-python examples/run_deoxys_with_space_mouse.py 
-```
+  # Control the robot
 
-Change 1) spacemouse vendor_id and product_id ([here](https://github.com/UT-Austin-RPL/deoxys_control/blob/eb8d69f7f0838389fca81cac6b250ba05fc97f92/deoxys/examples/run_deoxys_with_space_mouse.py#L19)) 2) robot interface 
-config ([here](https://github.com/UT-Austin-RPL/deoxys_control/blob/eb8d69f7f0838389fca81cac6b250ba05fc97f92/deoxys/examples/run_deoxys_with_space_mouse.py#L16)) if necessary.
+  ## Commands on Desktop
 
-You might also check and change the PC / NUC names [here](https://github.com/UT-Austin-RPL/deoxys_control/blob/master/deoxys/config/charmander.yml). 
+  Here is a quick guide to run `Deoxys`.
 
-## Commands on Control PC (Intel NUC)
+  Under `deoxys_control/deoxys`,  run
 
-Under `deoxys_control/deoxys`, run two commands. One for real-time control of the arm, one for non
-real-time control of the gripper.
+  ``` shell
+  python examples/run_deoxys_with_space_mouse.py
+  ```
 
-``` shell
-bin/franka-interface config/charmander.yml
-```
+  Change
+  1) spacemouse vendor_id and product_id ([here](https://github.com/UT-Austin-RPL/deoxys_control/blob/eb8d69f7f0838389fca81cac6b250ba05fc97f92/deoxys/examples/run_deoxys_with_space_mouse.py#L19))
 
-``` shell
-bin/gripper-interface config/charmander.yml
-```
+  2) robot interface config ([here](https://github.com/UT-Austin-RPL/deoxys_control/blob/eb8d69f7f0838389fca81cac6b250ba05fc97f92/deoxys/examples/run_deoxys_with_space_mouse.py#L16)) if necessary.
 
+  You might also check and change the PC / NUC names [here](https://github.com/UT-Austin-RPL/deoxys_control/blob/master/deoxys/config/charmander.yml).
+
+  ## Commands on Control PC (Intel NUC)
+
+  Under `deoxys_control/deoxys`, run two commands. One for real-time control of the arm, one for non
+  real-time control of the gripper.
+
+  ``` shell
+  bin/franka-interface config/charmander.yml
+  ```
+
+  ``` shell
+  bin/gripper-interface config/charmander.yml
+  ```
+</details>
