@@ -137,8 +137,13 @@ class XArmRobot(object):
 
         if real:
             from xarm.wrapper import XArmAPI
+            from xarm.core import XCONF
 
             self.robot = XArmAPI(ip, is_radian=True)
+            self.robot_config = XCONF()
+
+            self.device_type = int('{}1305'.format(self.robot.axis)) if self.robot.sn and int(self.robot.sn[2:6]) >= 1305 and int(self.robot.sn[2:6]) < 8500 else self.robot.device_type
+            self.joint_limit = self.robot_config.Robot.JOINT_LIMITS.get(self.robot.axis).get(self.device_type, [])
         else:
             self.robot = None
 
@@ -146,7 +151,7 @@ class XArmRobot(object):
             import pyRobotiqGripper
             gripper = pyRobotiqGripper.RobotiqGripper()
             self.gripper = gripper
-            #gripper.activate()
+            gripper.activate()
 
         self._control_frequency = control_frequency
         self._clear_error_states()
@@ -278,17 +283,18 @@ class XArmRobot(object):
                 gripper_command = self.target_command["gripper"]
 
             norm = np.linalg.norm(joint_delta)
-
             # threshold delta to be at most 0.01 in norm space
             if norm > self.max_delta:
                 delta = joint_delta / norm * self.max_delta
             else:
                 delta = joint_delta
+            if not all(d == 0 for d in delta):
+                target_joints = self.last_state.joints() + delta
 
-            # command position
-            self._set_position(
-                self.last_state.joints() + delta,
-            )
+                # command position
+                self._set_position(
+                    target_joints
+                )
             if self.use_gripper:
                 if gripper_command is not None:
                     set_point = gripper_command
