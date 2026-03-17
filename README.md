@@ -81,7 +81,7 @@ Clone this repo to the robot workspace directory on Desktop computer (e.g. `/hom
   To launch with gripper and specify gripper type (either robotiq or xarm):
 
   ```
-  python deoxys/deoxys/robot_interfaces/xarm_interface/xarm_client.py <IP of robot control box> -t "robotiq"
+  python deoxys/deoxys/robot_interfaces/xarm_interface/xarm_client.py <IP of robot control box> -g -t "robotiq"
   ```
 
 </details>
