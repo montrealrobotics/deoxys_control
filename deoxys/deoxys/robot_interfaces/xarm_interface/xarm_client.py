@@ -6,24 +6,28 @@ import argparse
 
 import numpy as np
 import zmq
+import sys
+
+#logging.basicConfig(level=logging.INFO, force=True, stream=sys.stdout)
 
 from xarm_control import XArmRobot, Rate
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, force=True, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
+
 class XArmBridge:
-    def __init__(self, robot_ip="192.168.42.222", dof=6, use_gripper=False, real_robot=True):
+    def __init__(self, robot_ip="192.168.42.222", dof=6, use_gripper=False, gripper_type='xarm', real_robot=True):
         self.dof = dof
         self.zmq_sub_addr = "tcp://0.0.0.0:5555"
         self.zmq_pub_addr = "tcp://0.0.0.0:5556"
         self.timeout_s = 0.35
         self.control_rate = 100
-
         self.robot = XArmRobot(
             ip=robot_ip,
             real=real_robot,
             use_gripper=use_gripper,
+            gripper_type=gripper_type,
             dof=dof,
             control_frequency=50.0
         )
@@ -40,7 +44,6 @@ class XArmBridge:
         self.pub_sock = ctx.socket(zmq.PUB)
         self.pub_sock.bind(self.zmq_pub_addr)
         self.pub_sock.setsockopt(zmq.SNDHWM, 1)
-
         logger.info(f"Bridge Active: SUB {self.zmq_sub_addr} | PUB {self.zmq_pub_addr}")
 
         self._latest_q: Optional[np.ndarray] = None
@@ -88,10 +91,12 @@ if __name__ == "__main__":
     parser.add_argument('robot_ip', type=str, default="192.168.42.222")
     parser.add_argument('-d', '--dof', type=int, default=6)
     parser.add_argument('-g', '--gripper', action='store_true')
+    parser.add_argument('-t', '--gripper_type', type=str, default="xarm")
     args = parser.parse_args()
 
     robot_ip = args.robot_ip
     dof = args.dof
     gripper = args.gripper
-    bridge = XArmBridge(robot_ip=robot_ip, dof=dof, use_gripper=gripper, real_robot=True)
+    gripper_type = args.gripper_type
+    bridge = XArmBridge(robot_ip=robot_ip, dof=dof, use_gripper=gripper, gripper_type=gripper_type, real_robot=True)
     bridge.run()

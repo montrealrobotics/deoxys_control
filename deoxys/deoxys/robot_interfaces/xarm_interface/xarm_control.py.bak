@@ -10,6 +10,10 @@ from pyquaternion import Quaternion
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("xarm_control")
 
+GRIPPER_OPEN = 0
+GRIPPER_CLOSED = 1
+
+
 class Transformations:
     @staticmethod
     def _aa_from_quat(quat: np.ndarray) -> np.ndarray:
@@ -111,8 +115,6 @@ class Rate:
 
 
 class XArmRobot(object):
-    GRIPPER_OPEN = 800
-    GRIPPER_CLOSE = 100
     DEFAULT_MAX_DELTA = 0.05
     def __init__(
         self,
@@ -146,24 +148,32 @@ class XArmRobot(object):
             self.joint_limit = self.robot_config.Robot.JOINT_LIMITS.get(self.robot.axis).get(self.device_type, [])
         else:
             self.robot = None
-
+        self.gripper_open_raw = 850
+        self.gripper_closed_raw = 0
         if self.use_robotiq:
-            import pyRobotiqGripper
-            gripper = pyRobotiqGripper.RobotiqGripper()
+            from pyrobotiqgripper import RobotiqGripper
+            gripper = RobotiqGripper()
             self.gripper = gripper
-            gripper.activate()
+            gripper.connect()
+            gripper.resetActivate()
+            time.sleep(5)
+            gripper.move(255, wait=True)
+            self.gripper_closed_raw = gripper.getPosition()
+
+            gripper.move(0, wait=True)
+            self.gripper_open_raw = gripper.getPosition()
 
         self._control_frequency = control_frequency
         self._clear_error_states()
         if self.use_gripper:
-            self._set_gripper_position(self.GRIPPER_OPEN)
+            self._set_gripper_position(GRIPPER_OPEN, wait=True)
 
         self.last_state_lock = threading.Lock()
         self.target_command_lock = threading.Lock()
         self.last_state = self._update_last_state()
         self.target_command = {
             "joints": self.last_state.joints(),
-            "gripper": 0,
+            "gripper": GRIPPER_OPEN,
         }
         self.running = True
         self.command_thread = None
@@ -236,7 +246,7 @@ class XArmRobot(object):
         if self.robot is None:
             return 0.0
         if self.use_robotiq:
-            return self.gripper.getPosition() / 255
+            gripper_pos = self.gripper.getPosition()
         else:
             code, gripper_pos = self.robot.get_gripper_position()
             while code != 0 or gripper_pos is None:
@@ -245,30 +255,28 @@ class XArmRobot(object):
                 code, gripper_pos = self.robot.get_gripper_position()
                 if code == 22:
                     self._clear_error_states()
+        normalized_gripper_pos = (gripper_pos - self.gripper_open_raw) / (self.gripper_closed_raw - self.gripper_open_raw)
+        return normalized_gripper_pos
 
-            normalized_gripper_pos = (gripper_pos - self.GRIPPER_OPEN) / (
-                self.GRIPPER_CLOSE - self.GRIPPER_OPEN
-            )
-            return normalized_gripper_pos
-
-    def _set_gripper_position(self, pos: int) -> None:
+    def _set_gripper_position(self, pos: int, wait=False) -> None:
         if self.robot is None:
             return
+        range_width = self.gripper_closed_raw - self.gripper_open_raw
+        pos_cmd = self.gripper_open_raw + (pos * range_width)
         if self.use_robotiq:
-            pos = 255 - (pos / 800 * 255)
             try:
-                self.gripper.goTo(pos, wait=False)
+                self.gripper.move(pos_cmd, wait=wait)
             except Exception as e:
                 logger(e)
-                logger.error(pos)
+                logger.error(pos_cmd)
                 raise e
         else:
-            self.robot.set_gripper_position(pos, wait=False)
+            self.robot.set_gripper_position(pos_cmd, wait=wait)
 
     def run(self):
         rate = Rate(
             duration=1 / self._control_frequency
-        )  # command and update rate for robot
+        )
         step_times = []
         count = 0
 
@@ -298,10 +306,7 @@ class XArmRobot(object):
             if self.use_gripper:
                 if gripper_command is not None:
                     set_point = gripper_command
-                    self._set_gripper_position(
-                        self.GRIPPER_OPEN
-                        + set_point * (self.GRIPPER_CLOSE - self.GRIPPER_OPEN)
-                    )
+                    self._set_gripper_position(set_point, wait=False)
             self.last_state = self._update_last_state()
 
             rate.sleep()
@@ -391,7 +396,6 @@ if __name__ == "__main__":
     logger.info('* robot_ip: {}'.format(robot_ip))
     logger.info('**********************************************************************')
     teleop = XArmRobot(robot_ip, use_gripper=use_gripper)
-    import time
 
     time.sleep(1)
     logger.info(teleop.get_state())
