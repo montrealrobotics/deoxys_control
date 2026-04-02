@@ -68,7 +68,7 @@ class XArmRobot:
         self.target_command_lock = threading.Lock()
         self.last_state = self._update_last_state()
         self.target_command = {
-            "joints": self.last_state.joints(),
+            "joints": [0, -1.92492, -0.39460, 0.0, 1.51, -0.00435],
             "gripper": GRIPPER_OPEN,
         }
         self.running = True
@@ -122,7 +122,9 @@ class XArmRobot:
         rate = Rate(duration=1 / self._control_frequency)
         step_times = []
         count = 0
-
+        self._set_mode(0)
+        self._set_position(self.target_command["joints"])
+        self._set_mode(1)
         while self.running:
             s_t = time.time()
             self.last_state = self._update_last_state()
@@ -132,10 +134,11 @@ class XArmRobot:
                 gripper_command = self.target_command["gripper"]
 
             norm = np.linalg.norm(joint_delta)
+            if norm > self.max_delta:
             delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
 
             if not np.all(delta == 0):
-                self._set_position(self.last_state.joints() + delta)
+                self._set_delta_position(self.last_state.joints() + delta)
 
             if self.use_gripper and gripper_command is not None:
                 self._gripper_obj.set_position(gripper_command, wait=False)
@@ -166,12 +169,23 @@ class XArmRobot:
         self.robot.set_state(state=0)
         time.sleep(1)
 
+    def _set_mode(self, mode) -> None:
+        if self.robot is None:
+            return
+        print(f'setting mode to {mode}')
+        self.robot.motion_enable(True)
+        time.sleep(1)
+        self.robot.set_mode(mode)
+        time.sleep(1)
+        self.robot.set_state(state=0)
+        time.sleep(1)
+
     def _update_last_state(self) -> RobotState:
         with self.last_state_lock:
             if self.robot is None:
                 return RobotState(
                     x=0.0, y=0.0, z=0.0, gripper=0.0,
-                    joints_list=(0.0,) * self.dof,
+                    joints_list=(0.0,) * self.arm_dof,
                     aa=np.zeros(3),
                 )
 
@@ -197,10 +211,17 @@ class XArmRobot:
 
             return RobotState.from_robot(cart_pos, servo_angle, gripper_pos, aa)
 
-    def _set_position(self, joints: np.ndarray) -> None:
+    def _set_delta_position(self, joints: np.ndarray) -> None:
         if self.robot is None:
             return
         ret = self.robot.set_servo_angle_j(joints, wait=False, is_radian=True)
         if ret in [1, 9]:
             self._clear_error_states()
 
+    def _set_position(self, joints: np.ndarray) -> None:
+        vel = 0.3
+        if self.robot is None:
+            return
+        ret = self.robot.set_servo_angle(angle=joints, speed=vel, wait=True, is_radian=True)
+        if ret in [1, 9]:
+            self._clear_error_states()
