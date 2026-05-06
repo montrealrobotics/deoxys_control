@@ -75,6 +75,7 @@ class XArmBridge:
                 state_packet = np.concatenate([
                     np.array([time.time()]),
                     obs["joint_positions"],
+                    obs["gripper_position"],
                     obs["ee_pos_quat"]
                 ]).astype(np.float64)
                 logger.debug(state_packet)

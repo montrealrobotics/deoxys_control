@@ -78,7 +78,7 @@ class FrankaInterface:
 
     def __init__(
         self,
-        general_cfg_file: str = "config/local-host.yml",
+        general_cfg: str,
         control_freq: float = 20.0,
         state_freq: float = 100.0,
         control_timeout: float = 1.0,
@@ -86,14 +86,13 @@ class FrankaInterface:
         use_visualizer: bool = False,
         automatic_gripper_reset: bool=True,
     ):
-        general_cfg = YamlConfig(general_cfg_file).as_easydict()
-        self._name = general_cfg.PC.NAME
-        self._ip = general_cfg.NUC.IP
-        self._pub_port = general_cfg.NUC.SUB_PORT
-        self._sub_port = general_cfg.NUC.PUB_PORT
+        self._name = general_cfg.LOCAL_HOST.NAME
+        self._ctrl_ip = general_cfg.CTRL_HOST.IP_ETH
+        self._cmd_port = general_cfg.CTRL_HOST.ARM_SUB_PORT
+        self._state_port = general_cfg.CTRL_HOST.ARM_PUB_PORT
 
-        self._gripper_pub_port = general_cfg.NUC.GRIPPER_SUB_PORT
-        self._gripper_sub_port = general_cfg.NUC.GRIPPER_PUB_PORT
+        self._gripper_pub_port = general_cfg.CTRL_HOST.GRIPPER_SUB_PORT
+        self._gripper_sub_port = general_cfg.CTRL_HOST.GRIPPER_PUB_PORT
 
         self._context = zmq.Context()
         self._publisher = self._context.socket(zmq.PUB)
@@ -103,15 +102,15 @@ class FrankaInterface:
         self._gripper_subscriber = self._context.socket(zmq.SUB)
 
         # publisher
-        self._publisher.bind(f"tcp://*:{self._pub_port}")
+        self._publisher.bind(f"tcp://*:{self._cmd_port}")
         self._gripper_publisher.bind(f"tcp://*:{self._gripper_pub_port}")
 
         # subscriber
         self._subscriber.setsockopt_string(zmq.SUBSCRIBE, "")
-        self._subscriber.connect(f"tcp://{self._ip}:{self._sub_port}")
+        self._subscriber.connect(f"tcp://{self._ctrl_ip}:{self._state_port}")
 
         self._gripper_subscriber.setsockopt_string(zmq.SUBSCRIBE, "")
-        self._gripper_subscriber.connect(f"tcp://{self._ip}:{self._gripper_sub_port}")
+        self._gripper_subscriber.connect(f"tcp://{self._ctrl_ip}:{self._gripper_sub_port}")
 
         self._state_buffer = []
         self._state_buffer_idx = 0

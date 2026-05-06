@@ -135,7 +135,7 @@ class XArmRobot:
 
             norm = np.linalg.norm(joint_delta)
             if norm > self.max_delta:
-            delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
+                delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
 
             if not np.all(delta == 0):
                 self._set_delta_position(self.last_state.joints() + delta)
