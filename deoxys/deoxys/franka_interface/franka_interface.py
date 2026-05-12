@@ -253,7 +253,7 @@ class FrankaInterface:
             self._last_controller_type = controller_type
 
         controller_cfg = verify_controller_config(controller_cfg, use_default=True)
-
+        assert controller_cfg.controller_type == controller_type
         state_estimator_msg = franka_controller_pb2.FrankaStateEstimatorMessage()
         state_estimator_msg.is_estimation = (
             controller_cfg.state_estimator_cfg.is_estimation
