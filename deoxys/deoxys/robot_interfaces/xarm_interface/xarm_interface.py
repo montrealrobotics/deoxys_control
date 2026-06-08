@@ -16,29 +16,35 @@ def _finite_vec(x: List[float]) -> bool:
 class XArmInterface:
     def __init__(
         self,
-        robot_ctrl_ip: str,
-        use_gripper: bool = False,
-        cmd_port: int = 5555,
-        state_port: int = 5556,
-        dof: int = 6,
+        general_cfg: str,
         control_freq: float = 30.0,
+        state_freq: float = 100.0,
         control_timeout: float = 1.0,
+        dof: int = 6,
+        has_gripper: bool = False,
+        use_visualizer: bool = False,
+        automatic_gripper_reset: bool=False,
         joint_map: Optional[List[int]] = None,
     ):
         self.dof = dof
+        self._ctrl_ip = general_cfg.CTRL_HOST.IP_ETH
+        self._cmd_port = general_cfg.CTRL_HOST.ARM_SUB_PORT
+        self._state_port = general_cfg.CTRL_HOST.ARM_PUB_PORT
         self._control_freq = control_freq
+        self._state_freq = state_freq
         self._control_interval = 1.0 / max(control_freq, 1e-6)
         self._control_timeout = control_timeout
 
         self.joint_map = joint_map if joint_map is not None else list(range(dof))
-        self.use_gripper = use_gripper
+        self.has_gripper = has_gripper
+        self.use_visualizer = use_visualizer
         self._ctx = zmq.Context.instance()
 
         self._pub = self._ctx.socket(zmq.PUB)
-        self._pub.connect(f"tcp://{robot_ctrl_ip}:{cmd_port}")
+        self._pub.connect(f"tcp://{self._ctrl_ip}:{self._cmd_port}")
 
         self._sub = self._ctx.socket(zmq.SUB)
-        self._sub.connect(f"tcp://{robot_ctrl_ip}:{state_port}")
+        self._sub.connect(f"tcp://{self._ctrl_ip}:{self._state_port}")
         self._sub.setsockopt(zmq.SUBSCRIBE, b"")
         self._sub.setsockopt(zmq.RCVHWM, 1)
 
@@ -50,7 +56,7 @@ class XArmInterface:
         self._state_thread.start()
 
         time.sleep(0.3)
-        self.last_time_ns: Optional[int] = None
+        self.last_time = None
 
     def _receive_state(self):
         """Background thread to keep the state buffer clean and current."""
@@ -68,21 +74,14 @@ class XArmInterface:
                     data = np.frombuffer(msg, dtype=np.float64)
                     if data.size >= (1 + self.dof + 7):
                         with self._state_lock:
-                            if self.use_gripper:
-                                self._latest_state = {
-                                    "timestamp": data[0],
-                                    "joint_positions": data[1:1+self.dof_arm],
-                                    "gripper_pos": data[1+self.dof_arm],
-                                    "ee_pos": data[2+self.dof_arm:2+self.dof_arm+3],
-                                    "ee_quat": data[2+self.dof_arm+3:2+self.dof_arm+7]
-                                }
-                            else:
-                                self._latest_state = {
-                                    "timestamp": data[0],
-                                    "joint_positions": data[1:1+self.dof],
-                                    "ee_pos": data[1+self.dof:1+self.dof+3],
-                                    "ee_quat": data[1+self.dof+3:1+self.dof+7]
-                                }
+                            self._latest_state = {
+                                "timestamp": data[0],
+                                "joint_positions": data[1:1+self.dof_arm],
+                                "gripper_pos": data[1+self.dof_arm],
+                                "ee_pos": data[2+self.dof_arm:2+self.dof_arm+3],
+                                "ee_quat": data[2+self.dof_arm+3:2+self.dof_arm+7]
+                            }
+
             except Exception as e:
                 logger.error(f"Error receiving state: {e}")
             time.sleep(0.001)
@@ -118,16 +117,16 @@ class XArmInterface:
         return None
 
     def _rate_limit_sleep(self, termination: bool):
-        if self.last_time_ns is None:
-            self.last_time_ns = time.time_ns()
+        if self.last_time is None:
+            self.last_time = time.time_ns()
             return
         if termination:
             return
         now_ns = time.time_ns()
-        remaining = self._control_interval - (now_ns - self.last_time_ns) / 1e9
+        remaining = self._control_interval - (now_ns - self.last_time) / 1e9
         if 0.0001 < remaining:
             time.sleep(remaining)
-        self.last_time_ns = time.time_ns()
+        self.last_time = time.time_ns()
 
     def close(self):
         self._running = False

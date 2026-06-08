@@ -35,8 +35,10 @@ def parse_args():
 def main():
     args = parse_args()
 
+    interface_cfg = YamlConfig(config_root + f"/{args.interface_cfg}").as_easydict()
+
     robot_interface = FrankaInterface(
-        config_root + f"/{args.interface_cfg}", use_visualizer=False
+        interface_cfg, use_visualizer=False
     )
     controller_cfg = YamlConfig(config_root + f"/{args.controller_cfg}").as_easydict()
 

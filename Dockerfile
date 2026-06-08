@@ -1,5 +1,6 @@
 #FROM nvidia/cuda:12.5.0-devel-ubuntu22.04
-FROM [ubuntu:22.04](https://hub.docker.com/_/ubuntu)
+
+FROM ubuntu:22.04
 # Set noninteractive mode to avoid prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 
