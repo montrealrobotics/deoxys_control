@@ -1,7 +1,11 @@
-#FROM nvidia/cuda:12.5.0-devel-ubuntu22.04
 
-FROM ubuntu:22.04
-# Set noninteractive mode to avoid prompts during installation
+ARG TARGET_ENV=cpu
+
+FROM nvidia/cuda:12.5.0-devel-ubuntu22.04 AS env-gpu
+FROM ubuntu:22.04 AS env-cpu
+
+FROM env-${TARGET_ENV} AS final
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 SHELL ["/bin/bash", "-c"]

@@ -1,9 +1,11 @@
 services:
-  deoxys_xarm:
+  deoxys_xarm_gpu:
     build:
       context: ..
       dockerfile: deoxys_control/Dockerfile
-    image: deoxys_xarm
+      args:
+        - TARGET_ENV=gpu
+    image: deoxys_xarm_gpu
     container_name: deoxys_xarm_cont
     volumes:
       - /dev/bus/usb:/dev/bus/usb
@@ -20,6 +22,30 @@ services:
     environment:
       - ROS_DOMAIN_ID=55
       - DISPLAY=${DISPLAY}
+
+  deoxys_xarm:
+    build:
+      context: ..
+      dockerfile: deoxys_control/Dockerfile
+      args:
+        - TARGET_ENV=cpu
+    image: deoxys_xarm
+    container_name: deoxys_xarm_cont
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+      - ../deoxys_control:/home/hw_ctrl_ws/src/deoxys_control
+    privileged: true
+    stdin_open: true
+    tty: true
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=55
+      - DISPLAY=${DISPLAY}
+
   deoxys_franka:
     build:
       context: ..
