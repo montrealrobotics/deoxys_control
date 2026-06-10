@@ -81,7 +81,12 @@ class YamlConfig(object):
             root_dir: The root directory of the configuration files.
         """
         # Read entire file for metadata.
-        fh = open(filename, "r")
+        try:
+            fh = open(filename, "r")
+        except FileNotFoundError:
+            print("Not a valid file or does not exist.")
+            return None
+
         self.file_contents = fh.read()
 
         # Replace !include directives with content.

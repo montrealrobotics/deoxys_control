@@ -32,8 +32,12 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 RUN mkdir -p /home/hw_ctrl_ws/src
 
 WORKDIR /home/hw_ctrl_ws/src
+COPY deoxys_control/deoxys/requirements_xarm.txt /home/requirements_xarm.txt
+WORKDIR /home/
+RUN pip install -r requirements_xarm.txt
+ENV PYTHONPATH=/home/hw_ctrl_ws/src/deoxys_control/deoxys:${PYTHONPATH}
 
 RUN pip3 install zmq xarm-python-sdk pyquaternion numpy pyRobotiqGripper
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
-WORKDIR /home/hw_ctrl_ws/src
+WORKDIR /home/hw_ctrl_ws/src/deoxys_control
 CMD ["bash"]

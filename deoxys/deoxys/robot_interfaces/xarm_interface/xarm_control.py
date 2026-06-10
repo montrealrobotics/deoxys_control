@@ -6,10 +6,10 @@ from typing import Dict, Optional
 import numpy as np
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent))
-from utils.state import RobotState
-from utils.utils import Rate
-from grippers import make_gripper, GRIPPER_OPEN
+#sys.path.append(str(Path(__file__).parent.parent))
+from deoxys.robot_interfaces.utils.state import RobotState
+from deoxys.robot_interfaces.utils.utils import Rate
+from deoxys.robot_interfaces.grippers import make_gripper, GRIPPER_OPEN
 
 logger = logging.getLogger("xarm_control")
 
@@ -134,8 +134,7 @@ class XArmRobot:
                 gripper_command = self.target_command["gripper"]
 
             norm = np.linalg.norm(joint_delta)
-            if norm > self.max_delta:
-                delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
+            delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
 
             if not np.all(delta == 0):
                 self._set_delta_position(self.last_state.joints() + delta)
@@ -189,7 +188,7 @@ class XArmRobot:
                     aa=np.zeros(3),
                 )
 
-            gripper_pos = self._gripper_obj.get_position() if self.use_gripper else None
+            gripper_pos = self._gripper_obj.get_position() if self.use_gripper else np.array([0.0])
 
             code, servo_angle = self.robot.get_servo_angle(is_radian=True)
             servo_angle = servo_angle[: self.dof_arm]
