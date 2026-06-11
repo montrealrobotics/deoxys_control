@@ -34,9 +34,11 @@ class XArmInterface:
         self._state_freq = state_freq
         self._control_interval = 1.0 / max(control_freq, 1e-6)
         self._control_timeout = control_timeout
-
-        self.joint_map = joint_map if joint_map is not None else list(range(dof))
+        if has_gripper:
+            self.dof += 1
+        self.joint_map = joint_map if joint_map is not None else list(range(self.dof))
         self.has_gripper = has_gripper
+
         self.use_visualizer = use_visualizer
         self._ctx = zmq.Context.instance()
 
