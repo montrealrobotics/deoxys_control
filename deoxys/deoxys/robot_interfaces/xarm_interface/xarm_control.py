@@ -66,13 +66,16 @@ class XArmRobot:
 
         self.last_state_lock = threading.Lock()
         self.target_command_lock = threading.Lock()
-        self.last_state = self._update_last_state()
+
         self.target_command = {
-            "joints": [0, -1.92492, -0.39460, 0.0, 1.51, -0.00435],
+            "joints": np.array([0.0, -1.92492, -0.39460, 0.0, 1.51, -0.00435][:self.dof_arm]),
             "gripper": GRIPPER_OPEN,
         }
+
+        self.last_state = self._update_last_state()
         self.running = True
         self.command_thread = None
+
         if real:
             self.command_thread = threading.Thread(target=self.run, daemon=True)
             self.command_thread.start()
@@ -87,7 +90,7 @@ class XArmRobot:
     def get_joint_state(self) -> np.ndarray:
         state = self.get_state()
         if self.use_gripper:
-            return np.concatenate([state.joints(), [state.gripper_pos()]])
+            return np.concatenate([state.joints(), np.array([state.gripper_pos()])])
         return state.joints()
 
     def command_joint_state(self, joint_state: np.ndarray) -> None:
@@ -102,7 +105,7 @@ class XArmRobot:
 
     def set_command(self, joints: np.ndarray, gripper: Optional[float] = None) -> None:
         with self.target_command_lock:
-            self.target_command = {"joints": joints, "gripper": gripper}
+            self.target_command = {"joints": np.array(joints), "gripper": gripper}
 
     def stop(self) -> None:
         self.running = False
@@ -111,50 +114,57 @@ class XArmRobot:
         state = self.get_state()
         pos_quat = np.concatenate([state.cartesian_pos(), state.quat()])
         joints = self.get_joint_state()
+
+        velocities = getattr(state, 'velocities', lambda: np.zeros_like(joints))()
+
         return {
             "joint_positions": joints,
-            "joint_velocities": joints,
+            "joint_velocities": velocities,
             "ee_pos_quat": pos_quat,
-            "gripper_position": np.array(state.gripper_pos()),
+            "gripper_position": np.array([state.gripper_pos()]),
         }
 
     def run(self) -> None:
         rate = Rate(duration=1 / self._control_frequency)
         step_times = []
         count = 0
+
         self._set_mode(0)
         self._set_position(self.target_command["joints"])
         self._set_mode(1)
+
         while self.running:
             s_t = time.time()
-            self.last_state = self._update_last_state()
+
+            current_state = self._update_last_state()
+            with self.last_state_lock:
+                self.last_state = current_state
 
             with self.target_command_lock:
-                joint_delta = self.target_command["joints"] - self.last_state.joints()
+                target_joints = self.target_command["joints"]
                 gripper_command = self.target_command["gripper"]
 
+            joint_delta = target_joints - current_state.joints()
             norm = np.linalg.norm(joint_delta)
             delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
 
             if not np.all(delta == 0):
-                self._set_delta_position(self.last_state.joints() + delta)
+                self._set_delta_position(current_state.joints() + delta)
 
             if self.use_gripper and gripper_command is not None:
                 self._gripper_obj.set_position(gripper_command, wait=False)
 
-            self.last_state = self._update_last_state()
             rate.sleep()
 
             step_times.append(time.time() - s_t)
             count += 1
             if count % 1000 == 0:
                 freq = 1 / np.mean(step_times)
-                logger.warning(
-                    f"Control loop frequency — mean: {freq:10.3f} Hz"
-                )
+                logger.warning(f"Control loop frequency — mean: {freq:10.3f} Hz")
                 step_times = []
 
     def _clear_error_states(self) -> None:
+        """Called during setup or safe initialization."""
         if self.robot is None:
             return
         self.robot.clean_error()
@@ -168,6 +178,16 @@ class XArmRobot:
         self.robot.set_state(state=0)
         time.sleep(1)
 
+    def _handle_runtime_error(self) -> None:
+        """Non-blocking error clear optimized for the real-time background thread."""
+        if self.robot is None:
+            return
+        logger.warning("Attempting hot-reset of xArm error flags...")
+        self.robot.clean_error()
+        self.robot.clean_warn()
+        self.robot.motion_enable(True)
+        self.robot.set_state(state=0)
+
     def _set_mode(self, mode) -> None:
         if self.robot is None:
             return
@@ -180,42 +200,46 @@ class XArmRobot:
         time.sleep(1)
 
     def _update_last_state(self) -> RobotState:
-        with self.last_state_lock:
-            if self.robot is None:
-                return RobotState(
-                    x=0.0, y=0.0, z=0.0, gripper=0.0,
-                    joints_list=(0.0,) * self.arm_dof,
-                    aa=np.zeros(3),
-                )
+        if self.robot is None:
+            return RobotState(
+                x=0.0, y=0.0, z=0.0, gripper=0.0,
+                joints_list=(0.0,) * self.dof_arm,
+                aa=np.zeros(3),
+            )
 
-            gripper_pos = self._gripper_obj.get_position() if self.use_gripper else np.array([0.0])
+        gripper_pos = self._gripper_obj.get_position() if self.use_gripper else 0.0
 
+        code, servo_angle = self.robot.get_servo_angle(is_radian=True)
+        if code != 0:
+            logger.error(f"get_servo_angle() error code {code}")
+            self._handle_runtime_error()
             code, servo_angle = self.robot.get_servo_angle(is_radian=True)
-            servo_angle = servo_angle[: self.dof_arm]
-            while code != 0:
-                logger.error(f"get_servo_angle() error code {code}, retrying...")
-                self._clear_error_states()
-                code, servo_angle = self.robot.get_servo_angle(is_radian=True)
-                servo_angle = servo_angle[: self.dof_arm]
 
+        servo_angle = servo_angle[: self.dof_arm] if code == 0 else [0.0] * self.dof_arm
+
+        code, cart_pos = self.robot.get_position_aa(is_radian=True)
+        if code != 0:
+            logger.error(f"get_position_aa() error code {code}")
+            self._handle_runtime_error()
             code, cart_pos = self.robot.get_position_aa(is_radian=True)
-            while code != 0:
-                logger.error(f"get_position_aa() error code {code}, retrying...")
-                self._clear_error_states()
-                code, cart_pos = self.robot.get_position_aa(is_radian=True)
 
+        if code == 0:
             cart_pos = np.array(cart_pos)
             aa = cart_pos[3:]
             cart_pos[:3] /= 1000  # mm → m
+        else:
+            cart_pos = np.zeros(6)
+            aa = np.zeros(3)
 
-            return RobotState.from_robot(cart_pos, servo_angle, gripper_pos, aa)
+        return RobotState.from_robot(cart_pos, servo_angle, gripper_pos, aa)
 
     def _set_delta_position(self, joints: np.ndarray) -> None:
         if self.robot is None:
             return
         ret = self.robot.set_servo_angle_j(joints, wait=False, is_radian=True)
         if ret in [1, 9]:
-            self._clear_error_states()
+            logger.error(f"set_servo_angle_j hardware error status: {ret}")
+            self._handle_runtime_error()
 
     def _set_position(self, joints: np.ndarray) -> None:
         vel = 0.3
@@ -223,4 +247,5 @@ class XArmRobot:
             return
         ret = self.robot.set_servo_angle(angle=joints, speed=vel, wait=True, is_radian=True)
         if ret in [1, 9]:
-            self._clear_error_states()
+            logger.error(f"set_servo_angle hardware error status: {ret}")
+            self._handle_runtime_error()

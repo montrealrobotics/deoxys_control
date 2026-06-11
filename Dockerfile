@@ -37,7 +37,6 @@ WORKDIR /home/
 RUN pip install -r requirements_xarm.txt
 ENV PYTHONPATH=/home/hw_ctrl_ws/src/deoxys_control/deoxys:${PYTHONPATH}
 
-RUN pip3 install zmq xarm-python-sdk pyquaternion numpy pyRobotiqGripper
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 WORKDIR /home/hw_ctrl_ws/src/deoxys_control
 CMD ["bash"]

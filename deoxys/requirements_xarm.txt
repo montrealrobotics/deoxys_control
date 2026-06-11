@@ -8,4 +8,8 @@ glfw
 numba
 termcolor
 simplejson
+pyrobotiqgripper
+pyquaternion
+zmq
+xarm-python-sdk
 

@@ -1,4 +1,5 @@
 from .xarm_control import XArmRobot
+from .xarm_interface import XArmInterface
 from ..utils.state import RobotState, Transformations
 from ..utils.utils import Rate
 from ..grippers import BaseGripper, XArmGripper, RobotiqGripper, make_gripper
