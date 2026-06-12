@@ -15,13 +15,16 @@ services:
     privileged: true
     stdin_open: true
     tty: true
-    network_mode: host
-    ipc: host
+    # network_mode: host
+    # ipc: host
     restart: unless-stopped
     runtime: nvidia
     environment:
       - ROS_DOMAIN_ID=55
       - DISPLAY=${DISPLAY}
+    ports:
+      - 5555:5555
+      - 5556:5556
 
   deoxys_xarm:
     build:
@@ -67,3 +70,4 @@ services:
     environment:
       - ROS_DOMAIN_ID=55
       - DISPLAY=${DISPLAY}
+
