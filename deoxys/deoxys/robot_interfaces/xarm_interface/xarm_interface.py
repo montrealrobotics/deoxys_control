@@ -26,6 +26,7 @@ class XArmInterface:
         automatic_gripper_reset: bool=False,
         joint_map: Optional[List[int]] = None,
     ):
+        self.dof_arm = dof
         self.dof = dof
         self._ctrl_ip = general_cfg.CTRL_HOST.IP_ETH
         self._cmd_port = general_cfg.CTRL_HOST.ARM_SUB_PORT
@@ -72,23 +73,23 @@ class XArmInterface:
                     except zmq.Again:
                         break
 
-                if msg:
-                    data = np.frombuffer(msg, dtype=np.float64)
-                    if data.size >= (1 + self.dof + 7):
-                        with self._state_lock:
-                            self._latest_state = {
-                                "timestamp": data[0],
-                                "joint_positions": data[1:1+self.dof_arm],
-                                "gripper_pos": data[1+self.dof_arm],
-                                "ee_pos": data[2+self.dof_arm:2+self.dof_arm+3],
-                                "ee_quat": data[2+self.dof_arm+3:2+self.dof_arm+7]
+                    if msg:
+                        data = np.frombuffer(msg, dtype=np.float64)
+                        if data.size >= (1 + self.dof + 7):
+                            with self._state_lock:
+                                self._latest_state = {
+                                    "timestamp": data[0],
+                                    "joint_positions": data[1:1+self.dof_arm],
+                                    "gripper_pos": data[1+self.dof_arm:2+self.dof_arm],
+                                    "ee_pos": data[2+self.dof_arm:2+self.dof_arm+3],
+                                    "ee_quat": data[2+self.dof_arm+3:2+self.dof_arm+7]
                             }
 
             except Exception as e:
                 logger.error(f"Error receiving state: {e}")
             time.sleep(0.001)
 
-    def get_state(self) -> Optional[Dict]:
+    def last_state(self) -> Optional[Dict]:
         """Returns the most recent robot state."""
         with self._state_lock:
             return self._latest_state

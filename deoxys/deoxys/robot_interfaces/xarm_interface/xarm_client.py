@@ -47,6 +47,7 @@ class XArmBridge:
 
         self._latest_q: Optional[np.ndarray] = None
         self._latest_rx_mono: float = 0.0
+        self.first_message = False
 
     def run(self):
         rate = Rate(duration=1 / self.control_rate)
@@ -58,8 +59,13 @@ class XArmBridge:
                         msg = self.sub_sock.recv(zmq.NOBLOCK)
                         arr = np.frombuffer(msg, dtype=np.float64)
                         if arr.size == (1 + self.dof):
+                            if not self.first_message:
+                                logger.info("Receiving messages from remote")
+                                self.first_message = True
                             self._latest_q = arr[1:]
                             self._latest_rx_mono = time.monotonic()
+                        else:
+                            logger.warn("Message received but wrong length...")
                 except zmq.Again:
                     pass
 

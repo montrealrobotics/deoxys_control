@@ -15,8 +15,8 @@ services:
     privileged: true
     stdin_open: true
     tty: true
-    # network_mode: host
-    # ipc: host
+    network_mode: host
+    ipc: host
     restart: unless-stopped
     runtime: nvidia
     environment:
