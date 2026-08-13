@@ -4,36 +4,44 @@ import logging
 from typing import Dict, Optional
 
 import numpy as np
+import math
 import sys
 from pathlib import Path
 #sys.path.append(str(Path(__file__).parent.parent))
 from deoxys.robot_interfaces.utils.state import RobotState
-from deoxys.robot_interfaces.utils.utils import Rate
+from deoxys.robot_interfaces.utils.utils import Rate, ActionType
 from deoxys.robot_interfaces.grippers import make_gripper, GRIPPER_OPEN
 
 logger = logging.getLogger("xarm_control")
 
 
 class XArmRobot:
-    DEFAULT_MAX_DELTA = 0.05
-
     def __init__(
         self,
         ip: str = "192.168.42.222",
         real: bool = True,
         use_gripper: bool = True,
         dof: int = 6,
+        robot_mode = 6,
         control_frequency: float = 50.0,
-        max_delta: float = DEFAULT_MAX_DELTA,
         gripper_type: str = "xarm",
     ):
         logger.info(f"Connecting to robot at {ip}")
         self.real = real
         self.use_gripper = use_gripper
-        self.max_delta = max_delta
+
         self.dof = dof
         self.dof_arm = dof - 1 if use_gripper else dof
         self._control_frequency = control_frequency
+        self._joint_speed = math.radians(90)
+        self._joint_acc = math.radians(500)
+        self._cmd_cnt = 0
+        self.robot_mode = robot_mode
+
+        if self.robot_mode == 6:
+            self.max_delta = 0.1
+        else:
+            self.max_delta = 0.05
 
         if real:
             from xarm.wrapper import XArmAPI
@@ -70,6 +78,7 @@ class XArmRobot:
         self.target_command = {
             "joints": np.array([0.0, -1.92492, -0.39460, 0.0, 1.51, -0.00435][:self.dof_arm]),
             "gripper": GRIPPER_OPEN,
+            "action_type": ActionType.delta,
         }
 
         self.last_state = self._update_last_state()
@@ -103,9 +112,9 @@ class XArmRobot:
                 f"Invalid joint state length {len(joint_state)}: expected {self.dof_arm} or {self.dof}."
             )
 
-    def set_command(self, joints: np.ndarray, gripper: Optional[float] = None) -> None:
+    def set_command(self, joints: np.ndarray, gripper: Optional[float] = None, action_type = ActionType.delta) -> None:
         with self.target_command_lock:
-            self.target_command = {"joints": np.array(joints), "gripper": gripper}
+            self.target_command = {"joints": np.array(joints), "gripper": gripper, "action_type": action_type}
 
     def stop(self) -> None:
         self.running = False
@@ -131,7 +140,7 @@ class XArmRobot:
 
         self._set_mode(0)
         self._set_position(self.target_command["joints"])
-        self._set_mode(1)
+        self._set_mode(self.robot_mode)
 
         while self.running:
             s_t = time.time()
@@ -143,13 +152,17 @@ class XArmRobot:
             with self.target_command_lock:
                 target_joints = self.target_command["joints"]
                 gripper_command = self.target_command["gripper"]
+                action_type = self.target_command["action_type"]
 
-            joint_delta = target_joints - current_state.joints()
-            norm = np.linalg.norm(joint_delta)
-            delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
+            if action_type == ActionType.delta:
+                joint_delta = target_joints - current_state.joints()
+                norm = np.linalg.norm(joint_delta)
+                delta = joint_delta / norm * self.max_delta if norm > self.max_delta else joint_delta
 
-            if not np.all(delta == 0):
-                self._set_delta_position(current_state.joints() + delta)
+                if not np.all(delta == 0):
+                    self._set_delta_position(current_state.joints() + delta)
+            else:
+                self._set_position(self.target_command["joints"])
 
             if self.use_gripper and gripper_command is not None:
                 self._gripper_obj.set_position(gripper_command, wait=False)
@@ -171,7 +184,7 @@ class XArmRobot:
         self.robot.clean_warn()
         self.robot.motion_enable(True)
         time.sleep(1)
-        self.robot.set_mode(1)
+        self.robot.set_mode(self.robot_mode)
         time.sleep(1)
         self.robot.set_collision_sensitivity(0)
         time.sleep(1)
@@ -236,7 +249,15 @@ class XArmRobot:
     def _set_delta_position(self, joints: np.ndarray) -> None:
         if self.robot is None:
             return
-        ret = self.robot.set_servo_angle_j(joints, wait=False, is_radian=True)
+
+        wait_ = True if self._cmd_cnt == 0 else False
+        if self.robot_mode == 6:
+            jnt_spd = 0.2 if self._cmd_cnt < 20 else self._joint_speed
+            ret = self.robot.set_servo_angle(angle=joints, speed=jnt_spd, mvacc=self._joint_acc, is_radian=True, wait=wait_)
+        elif self.robot_mode == 1:
+            ret = self.robot.set_servo_angle_j(joints, wait=False, is_radian=True)
+        if self._cmd_cnt < 99999:
+            self._cmd_cnt += 1
         if ret in [1, 9]:
             logger.error(f"set_servo_angle_j hardware error status: {ret}")
             self._handle_runtime_error()

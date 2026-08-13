@@ -58,7 +58,7 @@ class XArmBridge:
                     while True:
                         msg = self.sub_sock.recv(zmq.NOBLOCK)
                         arr = np.frombuffer(msg, dtype=np.float64)
-                        if arr.size == (1 + self.dof):
+                        if arr.size == (2 + self.dof):
                             if not self.first_message:
                                 logger.info("Receiving messages from remote")
                                 self.first_message = True
@@ -76,7 +76,8 @@ class XArmBridge:
                             # self.robot.dof_arm represents just the arm degrees of freedom
                             self.robot.set_command(
                                 self._latest_q[:self.robot.dof_arm],
-                                self._latest_q[self.robot.dof_arm]
+                                self._latest_q[self.robot.dof_arm:self.robot.dof_arm + 1],
+                                self._latest_q[-1]
                             )
                         else:
                             self.robot.set_command(self._latest_q)

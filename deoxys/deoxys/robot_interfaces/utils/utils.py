@@ -1,4 +1,5 @@
 import time
+from enum import IntEnum
 
 class Rate:
     def __init__(self, *, duration: float):
@@ -14,8 +15,12 @@ class Rate:
         now = time.monotonic()
         passed = now - self.last
         remaining = duration - passed
-
         if remaining > 0.0001:
             time.sleep(remaining)
-
         self.last = time.monotonic()
+
+
+
+class ActionType(IntEnum):
+    delta = 0
+    move_to = 1

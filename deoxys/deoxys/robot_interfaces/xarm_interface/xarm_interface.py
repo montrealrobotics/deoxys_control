@@ -3,6 +3,7 @@ import math
 import logging
 import threading
 from typing import Optional, List, Union, Dict
+from deoxys.robot_interfaces.utils.utils import ActionType
 
 import numpy as np
 import zmq
@@ -12,6 +13,7 @@ logger = logging.getLogger("xarm_interface")
 
 def _finite_vec(x: List[float]) -> bool:
     return all(isinstance(v, (int, float)) and math.isfinite(v) for v in x)
+
 
 class XArmInterface:
     def __init__(
@@ -98,6 +100,7 @@ class XArmInterface:
         self,
         controller_type: str,
         action: Union[np.ndarray, list],
+        action_type = ActionType.delta,
         controller_cfg: dict = None,
         termination: bool = False,
     ):
@@ -115,7 +118,7 @@ class XArmInterface:
         # Re-map joints if necessary
         q_xarm = [q[self.joint_map[i]] for i in range(self.dof)]
 
-        payload = np.concatenate(([time.time()], np.array(q_xarm, dtype=np.float64))).astype(np.float64)
+        payload = np.concatenate(([time.time()], np.array(q_xarm, dtype=np.float64), [action_type])).astype(np.float64)
         self._pub.send(payload.tobytes())
         return None
 
