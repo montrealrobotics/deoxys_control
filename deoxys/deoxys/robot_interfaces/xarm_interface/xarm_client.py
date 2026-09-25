@@ -80,7 +80,7 @@ class XArmBridge:
                                 self._latest_q[-1]
                             )
                         else:
-                            self.robot.set_command(self._latest_q)
+                            self.robot.set_command(self._latest_q[:self.robot.dof_arm], None, self._latest_q[-1])
 
                 obs = self.robot.get_observations()
 
